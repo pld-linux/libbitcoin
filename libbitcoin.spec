@@ -1,115 +1,81 @@
 #
 # Conditional build:
-%bcond_without	apidocs		# do not build and package API docs
-%bcond_without	static_libs	# don't build static libraries
+%bcond_without	static_libs	# static library
 #
 Summary:	Bitcoin Cross-Platform C++ Development Toolkit 
-# Summary(pl.UTF-8):	-
+Summary(pl.UTF-8):	Wieloplatformowy toolkit C++ do programowania związanego z bitcoinami
 Name:		libbitcoin
 Version:	3.3.0
-Release:	0.1
+Release:	1
 License:	AGPL with a lesser clause
 Group:		Libraries
-Source0:	https://github.com/%{name}/%{name}/archive/v%{version}.tar.gz
+#Source0Download: https://github.com/libbitcoin/libbitcoin-system/releases
+#Source0:	https://github.com/libbitcoin/libbitcoin-system/archive/v%{version}/%{name}-%{version}.tar.gz
+Source0:	https://github.com/libbitcoin/libbitcoin/archive/v%{version}.tar.gz
 # Source0-md5:	04af8f20cf05a4f2ae4edbb3211f520c
-#Patch0:	%{name}-what.patch
-URL:		https://libbitcoin.org/
-BuildRequires:	libsecp256k1-devel
-BuildRequires:	boost-devel
-#BuildRequires:	autoconf
-#BuildRequires:	automake
-#BuildRequires:	intltool
-#BuildRequires:	libtool
-#Requires(postun):	-
-#Requires(pre,post):	-
-#Requires(preun):	-
-#Requires:	-
-#Provides:	-
-#Obsoletes:	-
-#Conflicts:	-
+Patch0:		%{name}-boost.patch
+URL:		https://libbitcoin.info/
+BuildRequires:	autoconf >= 2.65
+BuildRequires:	automake
+# chrono date_time filesystem iostreams locale log program_options regex system thread unit_test_framework
+BuildRequires:	boost-devel >= 1.57.0
+BuildRequires:	libpng-devel >= 2:1.6.29
+BuildRequires:	libsecp256k1-devel >= 0.0.1
+BuildRequires:	libstdc++-devel >= 6:4.7
+BuildRequires:	libtool
+BuildRequires:	pkgconfig
+BuildRequires:	qrencode-devel >= 3.4.4
+Requires:	libpng >= 2:1.6.29
+Requires:	libsecp256k1 >= 0.0.1
+Requires:	qrencode-libs >= 3.4.4
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
-
-# do not keep them in newly created specs
-# these are only here to help fixing quickly broken specs
-# %%define		filterout_ld	-Wl,--no-copy-dt-needed-entries
-# %%define		filterout_ld	-Wl,--as-needed
-# do not commit spec containing this (use for local testing only):
-# %%define		filterout_c	-Werror=format-security
-# %%define		filterout_cxx	-Werror=format-security
-
-# Ignore file in __spec_install_post_check_so
-BuildRequires:	rpmbuild(macros) >= 1.583
-%define		skip_post_check_so	libunresolved.so.*
-
-# do not commit spec containing this (use for local testing only):
-%define		no_install_post_check_tmpfiles	1
 
 %description
 Bitcoin Cross-Platform C++ Development Toolkit 
 
-#%description -l pl.UTF-8
-
-%package common
-Summary:	Common files for %{name} library
-Summary(pl.UTF-8):	Wspólne pliki biblioteki %{name}
-Group:		Libraries
-Requires:	%{name} = %{version}-%{release}
-
-%description common
-Common files for %{name} library.
-
-%description common -l pl.UTF-8
-Wspólne pliki biblioteki %{name}.
+%description -l pl.UTF-8
+Wieloplatformowy toolkit C++ do programowania związanego z bitcoinami.
 
 %package devel
-Summary:	Header files for %{name} library
-Summary(pl.UTF-8):	Pliki nagłówkowe biblioteki %{name}
+Summary:	Header files for libbitcoin library
+Summary(pl.UTF-8):	Pliki nagłówkowe biblioteki libbitcoin
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
+Requires:	boost-devel >= 1.57.0
+Requires:	libpng-devel >= 2:1.6.29
+Requires:	libsecp256k1-devel >= 0.0.1
+Requires:	libstdc++-devel >= 6:4.7
+Requires:	qrencode-devel >= 3.4.4
 
 %description devel
-Header files for %{name} library.
+Header files for libbitcoin library.
 
 %description devel -l pl.UTF-8
-Pliki nagłówkowe biblioteki %{name}.
+Pliki nagłówkowe biblioteki libbitcoin.
 
 %package static
-Summary:	Static %{name} library
-Summary(pl.UTF-8):	Statyczna biblioteka %{name}
+Summary:	Static libbitcoin library
+Summary(pl.UTF-8):	Statyczna biblioteka libbitcoin
 Group:		Development/Libraries
 Requires:	%{name}-devel = %{version}-%{release}
 
 %description static
-Static %{name} library.
+Static libbitcoin library.
 
 %description static -l pl.UTF-8
-Statyczna biblioteka %{name}.
-
-%package apidocs
-Summary:	%{name} API documentation
-Summary(pl.UTF-8):	Dokumentacja API biblioteki %{name}
-Group:		Documentation
-
-%description apidocs
-API documentation for %{name} library.
-
-%description apidocs -l pl.UTF-8
-Dokumentacja API biblioteki %{name}.
+Statyczna biblioteka libbitcoin.
 
 %prep
 %setup -q
-#%patch0 -p1
+%patch0 -p1
 
 %build
-./autogen.sh
-# if ac/am/lt/* rebuilding is necessary, do it in this order and add
-# appropriate BuildRequires
-#%{__libtoolize}
-#%{__aclocal}
-#%{__autoconf}
-#%{__autoheader}
-#%{__automake}
+%{__libtoolize}
+%{__aclocal} -I m4
+%{__autoconf}
+%{__automake}
 %configure \
+	--disable-silent-rules \
 	%{!?with_static_libs:--disable-static} \
 	--with-png \
 	--with-qrencode
@@ -117,15 +83,14 @@ Dokumentacja API biblioteki %{name}.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-# create directories if necessary
-#install -d $RPM_BUILD_ROOT
 
 %{__make} install \
 	DESTDIR=$RPM_BUILD_ROOT
 
-# if library provides pkgconfig file containing proper {Requires,Libs}.private
-# then remove .la pollution
-#%{__rm} $RPM_BUILD_ROOT%{_libdir}/*.la
+# obsoleted by pkg-config
+%{__rm} $RPM_BUILD_ROOT%{_libdir}/libbitcoin.la
+# packaged as %doc
+%{__rm} -r $RPM_BUILD_ROOT%{_docdir}/libbitcoin
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -135,33 +100,19 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(644,root,root,755)
-%doc AUTHORS CREDITS README THANKS
-%attr(755,root,root) %{_libdir}/%{name}.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/%{name}.so.N
-
-%files common
-%defattr(644,root,root,755)
-%attr(755,root,root) %{_bindir}/%{name}*
-%{_datadir}/%{name}
+# COPYING contains AGPL v3 with additional exception
+%doc AUTHORS COPYING README.md
+%attr(755,root,root) %{_libdir}/libbitcoin.so.*.*.*
+%attr(755,root,root) %ghost %{_libdir}/libbitcoin.so.0
 
 %files devel
 %defattr(644,root,root,755)
-%doc devel-doc/* ChangeLog NEWS TODO
-%attr(755,root,root) %{_libdir}/%{name}.so
-# if no pkgconfig support, or it misses .private deps, then include .la file
-#%{_libdir}/libFOO.la
-%{_includedir}/%{name}
-%{_aclocaldir}/%{name}.m4
-%{_pkgconfigdir}/%{name}.pc
+%attr(755,root,root) %{_libdir}/libbitcoin.so
+%{_includedir}/bitcoin
+%{_pkgconfigdir}/libbitcoin.pc
 
 %if %{with static_libs}
 %files static
 %defattr(644,root,root,755)
-%{_libdir}/%{name}.a
-%endif
-
-%if %{with apidocs}
-%files apidocs
-%defattr(644,root,root,755)
-%doc apidocs/*
+%{_libdir}/libbitcoin.a
 %endif

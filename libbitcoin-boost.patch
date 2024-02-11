@@ -1,0 +1,98 @@
+--- libbitcoin-3.3.0/include/bitcoin/bitcoin/log/file_collector.hpp.orig	2017-08-11 08:35:33.000000000 +0200
++++ libbitcoin-3.3.0/include/bitcoin/bitcoin/log/file_collector.hpp	2024-02-10 21:10:24.459486079 +0100
+@@ -67,9 +67,12 @@ public:
+     //! The function stores the specified file in the storage
+     void store_file(boost::filesystem::path const& src_path) override;
+ 
++    //! The function checks if the specified path refers to an existing file in the storage
++    bool is_in_storage(boost::filesystem::path const& src_path) const override;
++
+     //! Scans the target directory for the files that have already been stored
+-    uintmax_t scan_for_files(boost::log::sinks::file::scan_method method,
+-        boost::filesystem::path const& pattern, unsigned int* counter) override;
++    boost::log::sinks::file::scan_result scan_for_files(boost::log::sinks::file::scan_method method,
++        boost::filesystem::path const& pattern = boost::filesystem::path()) override;
+ 
+     //! The function updates storage restrictions
+     void update(size_t max_size, size_t min_free_space, size_t max_files);
+--- libbitcoin-3.3.0/src/log/file_collector.cpp.orig	2017-08-11 08:35:33.000000000 +0200
++++ libbitcoin-3.3.0/src/log/file_collector.cpp	2024-02-10 21:11:23.262500849 +0100
+@@ -355,12 +355,18 @@ void file_collector::store_file(filesyst
+     total_size_ += info.size;
+ }
+ 
++//! The function checks if the specified path refers to an existing file in the storage
++bool file_collector::is_in_storage(boost::filesystem::path const& src_path) const
++{
++    return is_governed(src_path);
++}
+ 
+ //! Scans the target directory for the files that have already been stored
+-uintmax_t file_collector::scan_for_files(
++boost::log::sinks::file::scan_result file_collector::scan_for_files(
+     boost::log::sinks::file::scan_method method,
+-    filesystem::path const& pattern, unsigned int* counter)
++    filesystem::path const& pattern)
+ {
++    boost::log::sinks::file::scan_result result;
+     uintmax_t file_count = 0;
+     if (method != boost::log::sinks::file::no_scan)
+     {
+@@ -372,17 +378,12 @@ uintmax_t file_collector::scan_for_files
+             if (pattern.has_parent_path())
+                 dir = make_absolute(pattern.parent_path());
+         }
+-        else
+-        {
+-            counter = NULL;
+-        }
+ 
+         if (filesystem::exists(dir) && filesystem::is_directory(dir))
+         {
+             BOOST_LOG_EXPR_IF_MT(boost::lock_guard<boost::mutex> lock(mutex_);)
+ 
+-            if (counter)
+-                *counter = 0;
++            result.last_file_counter = 0;
+ 
+             file_list files;
+             filesystem::directory_iterator it(dir), end;
+@@ -414,10 +415,10 @@ uintmax_t file_collector::scan_for_files
+                             total_size += info.size;
+                             info.timestamp = filesystem::last_write_time(info.path);
+                             files.push_back(info);
+-                            ++file_count;
++                            ++result.found_count;
+ 
+-                            if (counter && file_number >= *counter)
+-                                *counter = file_number + 1;
++                            if (result.last_file_counter && file_number >= *result.last_file_counter)
++                                result.last_file_counter = file_number + 1;
+                         }
+                     }
+                 }
+@@ -430,7 +431,7 @@ uintmax_t file_collector::scan_for_files
+         }
+     }
+ 
+-    return file_count;
++    return result;
+ }
+ 
+ 
+--- libbitcoin-3.3.0/include/bitcoin/bitcoin/unicode/file_lock.hpp.orig	2017-08-11 08:35:33.000000000 +0200
++++ libbitcoin-3.3.0/include/bitcoin/bitcoin/unicode/file_lock.hpp	2024-02-10 21:46:50.430976988 +0100
+@@ -14,12 +14,12 @@
+ #define LIBBITCOIN_INTERPROCESS_FILE_LOCK_HPP
+ 
+ #include <string>
++#include <boost/date_time/posix_time/posix_time_types.hpp>
+ #include <boost/interprocess/detail/config_begin.hpp>
+ #include <boost/interprocess/detail/workaround.hpp>
+ #include <boost/interprocess/exceptions.hpp>
+ #include <boost/interprocess/detail/os_file_functions.hpp>
+ #include <boost/interprocess/detail/os_thread_functions.hpp>
+-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
+ #include <boost/interprocess/sync/detail/common_algorithms.hpp>
+ #include <boost/interprocess/sync/detail/locks.hpp>
+ #include <boost/move/move.hpp>
